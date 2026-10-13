@@ -53,7 +53,7 @@ function DuelContent() {
   // Presence must still be called every render regardless of loading state,
   // per the Rules of Hooks -- deckId may be null briefly, the hook itself
   // guards against that internally.
-  const users = useActiveUsers(deckId, me);
+  const users = useActiveUsers(deckId, roster);
   const others = users.filter((u) => u.email !== roster.email);
 
   const [groupId, setGroupId] = useState(null);
