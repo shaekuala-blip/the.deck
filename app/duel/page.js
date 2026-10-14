@@ -55,8 +55,8 @@ function DuelContent() {
   // guards against that internally.
   const users = useActiveUsers(deckId, roster);
   const others = users.filter((u) => u.email !== roster.email);
-
   const [groupId, setGroupId] = useState(null);
+  const chosenGroup = eligibleGroups.find((g) => g.id === groupId);
 
   if (loading) {
     return (
@@ -78,15 +78,34 @@ function DuelContent() {
     );
   }
 
-  const eligibleGroups = (deck.groups || []).filter(
-    (g) => deck.cards.filter((c) => c.groupId === g.id).length >= 2
-  );
-  const chosenGroup = eligibleGroups.find((g) => g.id === groupId);
-
   function challenge(user) {
     if (outgoing) return; // already waiting on someone else
     const cardIds = pickRoundCardIds(deck, groupId);
     sendChallenge(user, deckId, cardIds, chosenGroup?.name);
+  }
+
+  function pickGroup(user) {
+    return(
+      <div classname="fixed inset-0 z-[2000] flex items-center justify-center bg-green-dark/60 px-6">
+          <div className="bg-off-white rounded-xl p-6 max-w-xs text-center flex flex-col gap-4">
+            <p className="text-blue">
+		Challenge <span className="font-medium">{u.name}</span> in...
+		{eligibleGroups.length === 0 ? (
+            	  <p className="text-off-white text-sm max-w-xs text-center">
+              	    No category has enough cards yet. Add a few more cards to a group in Manage decks.
+            	  </p>
+          	) : (
+            	<div className="flex gap-3 flex-wrap justify-center">
+              	  {eligibleGroups.map((g) => (
+                    <button
+                    key={g.id}
+                    onClick={() => { setGroupId(g.id); onClick={() => challenge(u); }}
+                    className="px-4 py-2 rounded-lg bg-off-white text-blue text-sm"
+                >
+                  {g.name}
+                </button>
+              ))}
+    )
   }
 
   const ladderRows = ladder.map((r) => ({
@@ -102,63 +121,33 @@ function DuelContent() {
         <h1 className="text-2xl font-medium mt-1 text-off-white">Duel</h1>
       </div>
 
-      <div className="flex flex-col items-center gap-2">
-        <p className="text-xs text-off-white/80">
-          {ladderRows.length > 0 ? "Beat the top of the ladder to take their spot" : "No duels yet -- be the first"}
-        </p>
-        {ladderRows.length > 0 && <Leaderboard title="Duel ladder" rows={ladderRows} />}
+      {ladderRows.length > 0 && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-off-white/80">Beat the top of the ladder to take their spot</p>
+          <Leaderboard title="Duel ladder" rows={ladderRows} />
+        </div>
+      )}
+
+      <div className="text-center">
+        <h2 className="text-lg font-medium text-off-white">Who's active</h2>
       </div>
 
-      {!groupId ? (
-        <div className="flex flex-col items-center gap-4">
-          <h2 className="text-lg font-medium text-off-white">Choose a category to duel in</h2>
-          {eligibleGroups.length === 0 ? (
-            <p className="text-off-white text-sm max-w-xs text-center">
-              No category has enough cards yet. Add a few more cards to a group in Manage decks.
-            </p>
-          ) : (
-            <div className="flex gap-3 flex-wrap justify-center">
-              {eligibleGroups.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setGroupId(g.id)}
-                  className="px-4 py-2 rounded-lg bg-off-white text-blue text-sm"
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {others.length === 0 ? (
+        <p className="text-off-white text-sm max-w-xs text-center">
+          Nobody else is active in this deck right now. Once a classmate opens the app, they'll show up here.
+        </p>
       ) : (
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-center">
-            <h2 className="text-lg font-medium text-off-white">Who's active</h2>
-            <p className="text-xs text-off-white/70">Category: {chosenGroup?.name}</p>
-          </div>
-
-          {others.length === 0 ? (
-            <p className="text-off-white text-sm max-w-xs text-center">
-              Nobody else is active in this deck right now. Once a classmate opens the app, they'll show up here.
-            </p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 max-w-xl">
-              {others.map((u) => (
-                <button
-                  key={u.email}
-                  onClick={() => challenge(u)}
-                  disabled={!!outgoing}
-                  className="rounded-lg bg-off-white text-blue text-sm px-3 py-4 text-center disabled:opacity-50"
-                >
-                  {presenceLabel(u)} is active
-                </button>
-              ))}
-            </div>
-          )}
-
-          <button onClick={() => setGroupId(null)} className="text-sm underline text-off-white">
-            Change category
-          </button>
+        <div className="grid grid-cols-3 gap-3 max-w-xl">
+          {others.map((u) => (
+            <button
+              key={u.email}
+              onClick={() => pickGroup(u)}
+              disabled={!!outgoing}
+              className="rounded-lg bg-off-white text-blue text-sm px-3 py-4 text-center disabled:opacity-50"
+            >
+              {presenceLabel(u)} is active
+            </button>
+          ))}
         </div>
       )}
     </main>
