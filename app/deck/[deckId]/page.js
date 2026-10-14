@@ -35,10 +35,10 @@ function buildSequence(deck) {
 // touches an entrance card is wider, so the three entrances sit visibly
 // more spread out than the rest of the deck.
 const BASE_GAP_DEG = 4.5;
-const WIDE_GAP_DEG = 11;
+const WIDE_GAP_DEG = 20;
 // How far below the cards the fan's pivot point sits. Larger = flatter,
 // gentler curve; smaller = a more dramatic, tighter arc.
-const PIVOT_DISTANCE = 30;
+const PIVOT_DISTANCE = 300;
 
 function computeThetas(sequence) {
   const gaps = sequence.slice(0, -1).map((item, i) => {
