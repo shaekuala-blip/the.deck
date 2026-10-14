@@ -99,7 +99,7 @@ function DuelContent() {
               	  {eligibleGroups.map((g) => (
                     <button
                     key={g.id}
-                    onClick={() => { setGroupId(g.id); onClick={() => challenge(u); }}
+                    onClick={() => { setGroupId(g.id); challenge(u); }}
                     className="px-4 py-2 rounded-lg bg-off-white text-blue text-sm"
                 >
                   {g.name}
