@@ -38,12 +38,12 @@ const BASE_GAP_DEG = 4.5;
 const WIDE_GAP_DEG = 20;
 // How far below the cards the fan's pivot point sits. Larger = flatter,
 // gentler curve; smaller = a more dramatic, tighter arc.
-const PIVOT_DISTANCE = 390;
+const PIVOT_DISTANCE = 360;
 
 function computeThetas(sequence) {
   const gaps = sequence.slice(0, -1).map((item, i) => {
     const next = sequence[i + 1];
-    return item.type === "entrance" || next.type === "entrance" ? WIDE_GAP_DEG : BASE_GAP_DEG;
+    return next.type === "entrance" ? WIDE_GAP_DEG : BASE_GAP_DEG;
   });
   const cum = [0];
   gaps.forEach((g) => cum.push(cum[cum.length - 1] + g));
