@@ -21,6 +21,7 @@ export default function Duel() {
 }
 
 function DuelContent() {
+  const [selectedUser, setSelectedUser] = useState(null);
   const { roster } = useAuth();
   const { sendChallenge, outgoing } = useDuel();
   const [deckId] = useState(() => effectiveDeckId(roster));
@@ -56,6 +57,9 @@ function DuelContent() {
   const users = useActiveUsers(deckId, roster);
   const others = users.filter((u) => u.email !== roster.email);
   const [groupId, setGroupId] = useState(null);
+  const eligibleGroups = (deck.groups || []).filter(
+    (g) => deck.cards.filter((c) => c.groupId === g.id).length >= 2
+  );
   const chosenGroup = eligibleGroups.find((g) => g.id === groupId);
 
   if (loading) {
@@ -78,15 +82,15 @@ function DuelContent() {
     );
   }
 
-  function challenge(user) {
+  function challenge(user, selectedGroupId) {
     if (outgoing) return; // already waiting on someone else
-    const cardIds = pickRoundCardIds(deck, groupId);
+    const cardIds = pickRoundCardIds(deck, selectedGroupId);
     sendChallenge(user, deckId, cardIds, chosenGroup?.name);
   }
 
   function pickGroup(user) {
     return(
-      <div classname="fixed inset-0 z-[2000] flex items-center justify-center bg-green-dark/60 px-6">
+      <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-green-dark/60 px-6">
           <div className="bg-off-white rounded-xl p-6 max-w-xs text-center flex flex-col gap-4">
             <p className="text-blue">
 		Challenge <span className="font-medium">{u.name}</span> in...
@@ -99,7 +103,7 @@ function DuelContent() {
               	  {eligibleGroups.map((g) => (
                     <button
                     key={g.id}
-                    onClick={() => { setGroupId(g.id); challenge(u); }
+                    onClick={() => { setGroupId(g.id); challenge(u,g.id); }}
 					className="px-4 py-2 rounded-lg bg-off-white text-blue text-sm"
                 >
                   {g.name}
