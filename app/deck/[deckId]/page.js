@@ -35,7 +35,7 @@ function buildSequence(deck) {
 // touches an entrance card is wider, so the three entrances sit visibly
 // more spread out than the rest of the deck.
 const BASE_GAP_DEG = 4.5;
-const WIDE_GAP_DEG = 20;
+const WIDE_GAP_DEG = 30;
 // How far below the cards the fan's pivot point sits. Larger = flatter,
 // gentler curve; smaller = a more dramatic, tighter arc.
 const PIVOT_DISTANCE = 360;
