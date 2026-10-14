@@ -106,7 +106,7 @@ function DuelContent() {
                 </button>
               ))}
     )
-  }
+  };
 
   const ladderRows = ladder.map((r) => ({
     name: r.email === roster.email ? "You" : r.name,
