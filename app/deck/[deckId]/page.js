@@ -38,7 +38,7 @@ const BASE_GAP_DEG = 4.5;
 const WIDE_GAP_DEG = 20;
 // How far below the cards the fan's pivot point sits. Larger = flatter,
 // gentler curve; smaller = a more dramatic, tighter arc.
-const PIVOT_DISTANCE = 300;
+const PIVOT_DISTANCE = 390;
 
 function computeThetas(sequence) {
   const gaps = sequence.slice(0, -1).map((item, i) => {
@@ -123,8 +123,8 @@ function DeckPageContent() {
 
       <ActiveUsersList deckId={deckId} deckName={deck.name} me={roster} />
 
-      <div className="hidden sm:block w-full overflow-x-auto">
-        <div className="relative mx-auto" style={{ width: "100%", maxWidth: 1100, height: 420 }}>
+      <div className="hidden sm:block w-full">
+        <div className="relative mx-auto" style={{ width: "100%", maxWidth: 1100, height: 200 }}>
           {sequence.map((item, i) => {
             const theta = thetas[i];
             const isHovered = hoveredKey === item.key;
