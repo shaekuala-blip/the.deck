@@ -21,13 +21,16 @@ export default function Duel() {
 }
 
 function DuelContent() {
-  const [selectedUser, setSelectedUser] = useState(null);
   const { roster } = useAuth();
   const { sendChallenge, outgoing } = useDuel();
   const [deckId] = useState(() => effectiveDeckId(roster));
   const [deck, setDeck] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ladder, setLadder] = useState([]);
+  // The person whose card was clicked (an email), and the category picked for
+  // that challenge. Both reset whenever the pop-up closes.
+  const [selectedEmail, setSelectedEmail] = useState(null);
+  const [groupId, setGroupId] = useState(null);
 
   useEffect(() => {
     if (!deckId) {
@@ -48,19 +51,17 @@ function DuelContent() {
 
   useEffect(() => {
     if (!deckId) return;
-    getDuelLadder(deckId).then(setLadder);
+    let active = true;
+    getDuelLadder(deckId).then((rows) => {
+      if (active) setLadder(rows);
+    });
+    return () => {
+      active = false;
+    };
   }, [deckId]);
 
-  // Presence must still be called every render regardless of loading state,
-  // per the Rules of Hooks -- deckId may be null briefly, the hook itself
-  // guards against that internally.
+  // Every hook is above the early returns below (Rules of Hooks).
   const users = useActiveUsers(deckId, roster);
-  const others = users.filter((u) => u.email !== roster.email);
-  const [groupId, setGroupId] = useState(null);
-  const eligibleGroups = (deck.groups || []).filter(
-    (g) => deck.cards.filter((c) => c.groupId === g.id).length >= 2
-  );
-  const chosenGroup = eligibleGroups.find((g) => g.id === groupId);
 
   if (loading) {
     return (
@@ -82,77 +83,132 @@ function DuelContent() {
     );
   }
 
-  function challenge(user, selectedGroupId) {
-    if (outgoing) return; // already waiting on someone else
-    const cardIds = pickRoundCardIds(deck, selectedGroupId);
-    sendChallenge(user, deckId, cardIds, chosenGroup?.name);
+  const others = users.filter((u) => u.email !== roster.email);
+  const selectedUser = others.find((u) => u.email === selectedEmail) || null;
+
+  const eligibleGroups = (deck.groups || []).filter(
+    (g) => deck.cards.filter((c) => c.groupId === g.id).length >= 2
+  );
+  const chosenGroup = eligibleGroups.find((g) => g.id === groupId);
+  const canChallenge = !!selectedUser && !!chosenGroup && !outgoing;
+
+  function openChallenge(user) {
+    setGroupId(null);
+    setSelectedEmail(user.email);
   }
 
-  function pickGroup(user) {
-    return(
-      <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-green-dark/60 px-6">
-          <div className="bg-off-white rounded-xl p-6 max-w-xs text-center flex flex-col gap-4">
-            <p className="text-blue">
-		Challenge <span className="font-medium">{u.name}</span> in...
-		{eligibleGroups.length === 0 ? (
-            	  <p className="text-off-white text-sm max-w-xs text-center">
-              	    No category has enough cards yet. Add a few more cards to a group in Manage decks.
-            	  </p>
-          	) : (
-            	<div className="flex gap-3 flex-wrap justify-center">
-              	  {eligibleGroups.map((g) => (
-                    <button
-                    key={g.id}
-                    onClick={() => { setGroupId(g.id); challenge(u,g.id); }}
-					className="px-4 py-2 rounded-lg bg-off-white text-blue text-sm"
-                >
-                  {g.name}
-                </button>
-              ))}
-		</div>
-    )
+  function closeChallenge() {
+    setSelectedEmail(null);
+    setGroupId(null);
+  }
+
+  function sendIt() {
+    if (!canChallenge) return;
+    sendChallenge(selectedUser, deckId, pickRoundCardIds(deck, groupId), chosenGroup.name);
+    closeChallenge();
   }
 
   const ladderRows = ladder.map((r) => ({
-    name: r.email === roster.email ? "You" : r.name,
-    display: `#${r.rank}`,
+    key: r.email,
+    name: r.email === roster.email ? `${r.name} (you)` : r.name,
+    display: "",
+    isYou: r.email === roster.email,
   }));
 
   return (
-    <main className="min-h-dvh bg-green-dark flex flex-col items-center justify-center gap-8 px-6 py-16">
+    <main className="min-h-dvh bg-green-dark flex flex-col items-center gap-8 px-6 py-20">
       <Header />
       <div className="text-center">
         <p className="text-sm text-off-white">{deck.name}</p>
         <h1 className="text-2xl font-medium mt-1 text-off-white">Duel</h1>
       </div>
 
-      {ladderRows.length > 0 && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-xs text-off-white/80">Beat the top of the ladder to take their spot</p>
-          <Leaderboard title="Duel ladder" rows={ladderRows} />
-        </div>
-      )}
-
-      <div className="text-center">
-        <h2 className="text-lg font-medium text-off-white">Who's active</h2>
+      <div className="flex flex-col items-center gap-2 w-full">
+        <p className="text-xs text-off-white/80">Beat someone above you to take their spot</p>
+        <Leaderboard
+          title="Duel ladder"
+          rows={ladderRows}
+          emptyMessage="No duels yet -- be the first"
+        />
       </div>
 
-      {others.length === 0 ? (
-        <p className="text-off-white text-sm max-w-xs text-center">
-          Nobody else is active in this deck right now. Once a classmate opens the app, they'll show up here.
-        </p>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 max-w-xl">
-          {others.map((u) => (
-            <button
-              key={u.email}
-              onClick={() => pickGroup(u)}
-              disabled={!!outgoing}
-              className="rounded-lg bg-off-white text-blue text-sm px-3 py-4 text-center disabled:opacity-50"
-            >
-              {presenceLabel(u)} is active
-            </button>
-          ))}
+      <div className="flex flex-col items-center gap-4">
+        <h2 className="text-lg font-medium text-off-white">Who's active</h2>
+        {others.length === 0 ? (
+          <p className="text-off-white text-sm max-w-xs text-center">
+            Nobody else is active in this deck right now. Once a classmate opens the app, they'll show up here.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 max-w-xl">
+            {others.map((u) => (
+              <button
+                key={u.email}
+                onClick={() => openChallenge(u)}
+                className="rounded-lg bg-off-white text-blue text-sm px-3 py-4 text-center"
+              >
+                {presenceLabel(u)} is active
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedEmail && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 px-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="bg-off-white rounded-xl p-6 max-w-xs w-full text-center"
+          >
+            {selectedUser ? (
+              <p className="text-blue font-medium mb-1">
+                Duel {presenceLabel(selectedUser)}?
+              </p>
+            ) : (
+              <p className="text-red text-sm mb-1">This student is no longer active.</p>
+            )}
+            <p className="text-blue text-sm mb-3">Choose a category:</p>
+
+            {eligibleGroups.length === 0 ? (
+              <p className="text-blue text-sm mb-4">
+                No category has enough cards yet. Add a few more cards to a group in Manage decks.
+              </p>
+            ) : (
+              <div className="flex gap-2 flex-wrap justify-center mb-4">
+                {eligibleGroups.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => setGroupId(g.id)}
+                    className={`px-3 py-2 rounded-lg text-sm border border-blue ${
+                      g.id === groupId ? "bg-blue text-off-white" : "bg-white text-blue"
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={sendIt}
+                disabled={!canChallenge}
+                className={`w-full px-4 py-3 rounded-lg text-sm border ${
+                  canChallenge
+                    ? "bg-green-light text-green-dark border-green-light font-medium"
+                    : "bg-white text-blue border-blue opacity-60 cursor-not-allowed"
+                }`}
+              >
+                Challenge {selectedUser ? presenceLabel(selectedUser) : "this student"} to a Duel
+              </button>
+              <button
+                onClick={closeChallenge}
+                className="w-full px-4 py-2 rounded-lg text-sm border border-blue text-blue"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>
