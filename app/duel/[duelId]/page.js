@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getDeck } from "@/lib/decks";
-import { recordDuelResult } from "@/lib/duelLadder";
+import { getDuelLadder, recordDuelResult } from "@/lib/duelLadder";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
 import MatchingBoard from "@/components/MatchingBoard";
@@ -15,7 +15,9 @@ import { useAuth } from "@/components/AuthProvider";
 export default function DuelMatch() {
   return (
     <AuthGate>
-      <DuelMatchContent />
+      <Suspense fallback={null}>
+        <DuelMatchContent />
+      </Suspense>
     </AuthGate>
   );
 }
@@ -35,6 +37,13 @@ function DuelMatchContent() {
   const [result, setResult] = useState(null); // null | "you" | "opponent"
   const channelRef = useRef(null);
   const recordedRef = useRef(false);
+  const [ladder, setLadder] = useState(null); // null until fetched
+  const [recordError, setRecordError] = useState(false);
+
+  function refreshLadder() {
+    if (!deckId) return;
+    getDuelLadder(deckId).then(setLadder).catch(console.error);
+  }
 
   useEffect(() => {
     if (!deckId) {
@@ -62,6 +71,10 @@ function DuelMatchContent() {
           setResult((prev) => prev || "opponent");
         }
       })
+      .on("broadcast", { event: "recorded" }, () => {
+        // The winner has saved the result; the ladder is now up to date.
+        refreshLadder();
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,9 +89,24 @@ function DuelMatchContent() {
     if (!recordedRef.current && opponentEmail) {
       recordedRef.current = true;
       recordDuelResult(deckId, { email: roster.email, name: roster.name }, { email: opponentEmail, name: opponentName })
-        .catch((err) => console.error("Failed to record duel result:", err));
+        .then(() => {
+          refreshLadder();
+          channelRef.current?.send({ type: "broadcast", event: "recorded", payload: {} });
+        })
+        .catch((err) => {
+          console.error("Failed to record duel result:", err);
+          setRecordError(true);
+        });
     }
   }
+
+  // The loser also gets a fallback fetch in case the "recorded" message is missed.
+  useEffect(() => {
+    if (result !== "opponent") return;
+    const t = setTimeout(refreshLadder, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
 
   if (loading) {
     return (
@@ -99,9 +127,12 @@ function DuelMatchContent() {
   }
 
   if (result) {
-    const rows = result === "you"
-      ? [{ name: roster.name, display: "Winner" }, { name: opponentName, display: "" }]
-      : [{ name: opponentName, display: "Winner" }, { name: roster.name, display: "" }];
+    const rows = (ladder || []).map((r) => ({
+      key: r.email,
+      name: r.email === roster.email ? `${r.name} (you)` : r.name,
+      display: `#${r.rank}`,
+      isYou: r.email === roster.email,
+    }));
 
     return (
       <main className="min-h-dvh bg-green-dark flex flex-col items-center justify-center gap-6 px-6 text-center">
@@ -109,7 +140,16 @@ function DuelMatchContent() {
         <h1 className="text-3xl font-medium text-off-white">
           {result === "you" ? "You won!" : `${opponentName} won this time`}
         </h1>
-        <Leaderboard rows={rows} />
+        {recordError && (
+          <p className="text-pink text-sm max-w-xs">
+            Your win couldn't be saved to the ladder. Tell your teacher.
+          </p>
+        )}
+        <Leaderboard
+          title="Duel ladder"
+          rows={rows}
+          emptyMessage={ladder === null ? "Updating the ladder..." : "No duels yet"}
+        />
         <Link href="/duel" className="text-sm underline text-off-white mt-2">Back to Duel</Link>
       </main>
     );
